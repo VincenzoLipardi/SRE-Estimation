@@ -3,12 +3,10 @@ from pennylane import numpy as np
 import random
 import pickle
 import os
-import qiskit
 from qiskit import QuantumCircuit
-from qiskit.visualization import circuit_drawer
 
 # Function to generate a random gate
-def random_gate(num_qubits):
+def random_gate(num_qubits, basis_gates):
     gate_list = [
         qml.PauliX,   # X gate
         qml.PauliY,   # Y gate
@@ -21,10 +19,38 @@ def random_gate(num_qubits):
         qml.RZ,       # RZ rotation
         qml.CNOT      # CNOT gate
     ]
+    if basis_gates == "Clifford+T" or basis_gates == "clifford+t" or basis_gates == "Clifford+t" or basis_gates == "clifford+T":
+        gate_list = [
+            qml.PauliX,   # X gate
+            qml.PauliY,   # Y gate
+            qml.PauliZ,   # Z gate
+            qml.Hadamard, # H gate
+            qml.S,        # S gate
+            qml.CNOT,     # CNOT gate
+            qml.T,        # T gate
+        ]
+    elif basis_gates == "Clifford" or basis_gates == "clifford":
+        gate_list = [
+            qml.Hadamard, # H gate
+            qml.S,        # S gate
+            qml.T,        # T gate
+            qml.RX,       # RX rotation
+            qml.RY,       # RY rotation
+            qml.RZ,       # RZ rotation
+            qml.CNOT      # CNOT gate
+        ]
+    elif basis_gates == "rotations+cx" or basis_gates == "rotations+cnot" or basis_gates == "Rotations+cx" or basis_gates == "Rotations+cnot" or basis_gates == "Rotations+CNOT" or basis_gates == "Rotations+CNOT":
+        gate_list = [
+            qml.RX,       # RX rotation
+            qml.RY,       # RY rotation
+            qml.RZ,       # RZ rotation
+            qml.CNOT      # CNOT gate
+        ]
+    else:
+        raise ValueError(f"Invalid basis gates: {basis_gates}")
     
     # Pick a random gate
     gate = random.choice(gate_list)
-    
     # Generate a random qubit index
     qubit_index = random.randint(0, num_qubits - 1)
     
@@ -42,7 +68,7 @@ def random_gate(num_qubits):
         return gate(wires=qubit_index)
 
 # Function to generate a random quantum circuit and return the final state
-def random_quantum_circuit(num_qubits, num_gates):
+def random_quantum_circuit(num_qubits, num_gates, basis_gates):
     # Define a device with the given number of qubits
     dev = qml.device('lightning.qubit', wires=num_qubits)
 
@@ -51,7 +77,7 @@ def random_quantum_circuit(num_qubits, num_gates):
     def circuit():
         # Apply random gates
         for _ in range(num_gates):
-            random_gate(num_qubits)
+            random_gate(num_qubits, basis_gates)
         return qml.state()  # Return the statevector of the quantum system
 
     # Construct the circuit
@@ -60,24 +86,25 @@ def random_quantum_circuit(num_qubits, num_gates):
     # Convert to OpenQASM
     qasm_str = circuit.qtape.to_openqasm()
     
-    # Optionally, you can remove the measurement from the QASM string
-    # qasm_str = qasm_str[:-23]  # This would remove the final measurement line
+    # Remove the measurement and classical bits from the QASM string
+    qasm_lines = qasm_str.split('\n')
+    qasm_str = '\n'.join([line for line in qasm_lines if not line.startswith('creg') and not line.startswith('measure')])
     
     return qasm_str
 
 # Function to generate random circuits within a range of qubits and gates and save them
-def generate_and_save_circuits(qubit_range, gate_range, num_circuits):
+def generate_and_save_circuits(num_qubits, gate_range, num_circuits, basis_gates):
     # Create a directory for saving the QASM files
     os.makedirs("data", exist_ok=True)
     
     circuits = []
     for i in range(num_circuits):
         # Randomly select the number of qubits and gates from the given ranges
-        num_qubits = random.randint(qubit_range[0], qubit_range[1])
+
         num_gates = random.randint(gate_range[0], gate_range[1])
         
         # Generate a random quantum circuit and get the QASM string
-        qasm_str = random_quantum_circuit(num_qubits, num_gates)
+        qasm_str = random_quantum_circuit(num_qubits, num_gates, basis_gates)
         circuits.append({
             'qasm': qasm_str,
             'num_qubits': num_qubits,
@@ -85,7 +112,7 @@ def generate_and_save_circuits(qubit_range, gate_range, num_circuits):
         })
     
     # Dynamically create the filename based on the ranges
-    filename = f"random_circuits_qubits_{qubit_range[0]}-{qubit_range[1]}_gates_{gate_range[0]}-{gate_range[1]}.pkl"
+    filename = f"random_circuits_basis_{basis_gates}_qubits_{num_qubits}_gates_{gate_range[0]}-{gate_range[1]-1}.pkl"
     
     # Save the generated circuits to a .pkl file in the 'data' directory
     filepath = os.path.join('data', filename)
@@ -109,24 +136,10 @@ def qiskit_circuit_from_qasm(qasm_str, num_qubits):
     qc = QuantumCircuit.from_qasm_str(qasm_str)
     return qc
 
-# Example usage
-qubit_range = (2, 5)  # Range of qubits
-gate_range = (5, 15)  # Range of gates
-num_circuits = 10     # Number of circuits to generate
-
+# Data generatio
+num_circuits = 10000     # Number of circuits to generate
+basis_gates = "rotations+cx"
 # Generate and save random circuits
-saved_filepath = generate_and_save_circuits(qubit_range, gate_range, num_circuits)
-
-# Function to load the saved circuits
-def load_circuits(filepath):
-    with open(filepath, 'rb') as f:
-        return pickle.load(f)
-
-# Load the saved circuits
-loaded_circuits = load_circuits(saved_filepath)
-
-# Print some information about the loaded circuits
-print(f"Loaded {len(loaded_circuits)} circuits")
-for i, circuit in enumerate(loaded_circuits[:]):  # Print info for the first 3 circuits
-    print(f"Circuit {i+1}: {circuit['num_qubits']} qubits, {circuit['num_gates']} gates\n {qiskit_circuit_from_qasm(circuit['qasm'], circuit['num_qubits'])}")
-    
+for i in range(2,11):
+    for j in range(4,5):
+        saved_filepath = generate_and_save_circuits(num_qubits=i, gate_range=(20*j, 20*(j+1)), num_circuits=num_circuits, basis_gates=basis_gates)
