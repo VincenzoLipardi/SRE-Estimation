@@ -101,7 +101,7 @@ if __name__ == "__main__":
             # From qasm to pennylane circuits
             pennylane_circuits = [qml.from_qasm(circuit['qasm']) for circuit in circuits]
             # Create set of observables whose expectation value on the circuits constitute our designed features 
-            list_observables = generate_pauli_observables(n_qubits=num_qubit, max_qubits=4)
+            list_observables = generate_pauli_observables(n_qubits=num_qubit, max_qubits=2)
 
             for i, circuit_data in enumerate(tqdm(circuits, desc="Circuits", leave=False)):
                 circuit_func = pennylane_circuits[i]
