@@ -140,6 +140,6 @@ def qiskit_circuit_from_qasm(qasm_str, num_qubits):
 num_circuits = 10000     # Number of circuits to generate
 basis_gates = "rotations+cx"
 # Generate and save random circuits
-for i in range(2,11):
-    for j in range(4,5):
+for i in range(2,6):
+    for j in range(5):
         saved_filepath = generate_and_save_circuits(num_qubits=i, gate_range=(20*j, 20*(j+1)), num_circuits=num_circuits, basis_gates=basis_gates)

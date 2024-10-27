@@ -1,15 +1,13 @@
-import os
+import pickle
+from qiskit.visualization import dag_drawer
 
-# Define the directory containing the files
-directory = 'data/random_circuits'
+# Define the file path
+file_path = 'data/random_circuits/basis_rotations+cx_qubits_4_gates_0-19.pkl'
 
-# Iterate over all files in the directory
-for filename in os.listdir(directory):
-    # Construct the new filename by removing the prefix
-    new_filename = filename.replace('random_circuits_', '', 1)
-    # Construct full file paths
-    old_file = os.path.join(directory, filename)
-    new_file = os.path.join(directory, new_filename)
-    # Rename the file
-    os.rename(old_file, new_file)
-    print(f'Renamed: {old_file} to {new_file}')
+# Open the file in binary read mode and load the data
+with open(file_path, 'rb') as file:
+    data = pickle.load(file)
+
+# Print the data to verify
+print(len(data), len(data[1]))
+dag_drawer(data[1]["dag"], filename= "data/random_circuits/images/dag.png")
