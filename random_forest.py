@@ -1,11 +1,11 @@
 import os
 import pickle
 import numpy as np
-import pandas as pd
 import matplotlib.pyplot as plt
 from sklearn.ensemble import RandomForestRegressor
-from sklearn.model_selection import train_test_split
+from sklearn.model_selection import train_test_split, GridSearchCV
 from sklearn.metrics import mean_absolute_error, mean_squared_error, root_mean_squared_error, r2_score
+from sklearn.decomposition import PCA
 
 # Function to load data from .pkl files
 def load_data(directory, num_qubit):
@@ -18,19 +18,15 @@ def load_data(directory, num_qubit):
                 # print(circuit_data[0][0].keys())
                 # Assume circuit_data is a tuple (list_of_dicts, label, label)
                 for circuit in circuit_data:
-                    labels.append(circuit[2])
+                    labels.append(circuit[1])
                     data.append([float(v) for k, v in circuit[0].items() if 'obs_' in k and v is not None])
-    
     return np.array(data), labels
 
 # Function to train Random Forest on data
-def train_random_forest(data, labels, estimators):
+def train_random_forest(data, labels, estimators, criterion, max_features):
     
     X_train, X_test, y_train, y_test = train_test_split(data, labels, test_size=0.2, random_state=1)
-    rfr = RandomForestRegressor(n_estimators=estimators, 
-                                min_samples_leaf=1, 
-                                min_samples_split=2, 
-                                random_state=42)
+    rfr = RandomForestRegressor(n_estimators=estimators, criterion=criterion, max_features=max_features, random_state=42)
     rfr.fit(X_train, y_train)
     y_pred = rfr.predict(X_test)
 
@@ -59,61 +55,108 @@ def train_random_forest(data, labels, estimators):
     print(f"Root Mean Squared Error: {root_mean_squared_error_test:.4f}")
     print(f"R-squared Score: {r_squared_test:.4f}")
     return (mean_absolute_error_test, mean_squared_error_test, root_mean_squared_error_test, r_squared_test,
-            mean_absolute_error_train, mean_squared_error_train, root_mean_squared_error_train, r_squared_train)
+            mean_absolute_error_train, mean_squared_error_train, root_mean_squared_error_train, r_squared_train, rfr)
 
-def save_results_as_image(results_dict, estimators_dict, model_name):
-    # Create a figure with subplots for each qubit
-    num_qubits = len(results_dict)
-    fig, axes = plt.subplots(num_qubits, 1, figsize=(10, 4 * num_qubits))
+def perform_pca(data, num_components=4):
+    """
+    Perform PCA on the given data and plot the explained variance ratio.
     
-    if num_qubits == 1:
-        axes = [axes]  # Ensure axes is iterable if there's only one subplot
+    Parameters:
+    - data: The input data for PCA.
+    - num_components: Number of principal components to keep.
+    
+    Returns:
+    - transformed_data: The data transformed into the principal component space.
+    """
+    pca = PCA(n_components=num_components)
+    transformed_data = pca.fit_transform(data)
+    
+    # Plot the explained variance ratio
+    plt.figure(figsize=(8, 5))
+    plt.bar(range(1, num_components + 1), pca.explained_variance_ratio_, alpha=0.5, align='center')
+    plt.step(range(1, num_components + 1), np.cumsum(pca.explained_variance_ratio_), where='mid')
+    plt.xticks(ticks=np.arange(1, num_components + 1, 1))  # Set x-axis ticks to integers
+    plt.ylabel('Explained variance ratio')
+    plt.xlabel('Principal components')
+    plt.title('PCA Explained Variance')
+    plt.savefig("pca.png")
+    
+    return transformed_data
 
-    for ax, (qubit, results) in zip(axes, results_dict.items()):
-        # Unpack the results
-        mae_test, mse_test, rmse_test, r2_test, mae_train, mse_train, rmse_train, r2_train = results
-        
-        # Create a DataFrame
-        df = pd.DataFrame({
-            'Metric': ['MAE', 'MSE', 'RMSE', 'R²'],
-            'Training': [round(mae_train, 4), round(mse_train, 4), round(rmse_train, 4), round(r2_train, 4)],
-            'Test': [round(mae_test, 4), round(mse_test, 4), round(rmse_test, 4), round(r2_test, 4)]
-        })
-        
-        # Plot the DataFrame as a table
-        ax.axis('tight')
-        ax.axis('off')
-        ax.table(cellText=df.values, colLabels=df.columns, cellLoc='center', loc='center')
-        ax.set_title(f'Qubit: {qubit}, Estimators: {estimators_dict[qubit]}')
+def hyperparameter_search(X_train, y_train):
+    model = RandomForestRegressor(random_state=1)
+    hp_grid = {
+        'n_estimators': [50, 100],  
+        'max_features': ['sqrt'],  # Avoid 'auto' for small datasets
+        'criterion': ['squared_error', 'friedman_mse']   # Avoid 'absolute_error' if unsupported
+    }
+    GSCV = GridSearchCV(estimator=model, param_grid=hp_grid, cv=3)
+    GSCV.fit(X_train, y_train)
+    # print("Best params:", GSCV.best_params_)
+    return GSCV.best_params_
+
+def save_model_results(filename, model, hyperparameters, metrics):
+    """
+    Save the model results to a .pkl file.
+
+    Parameters:
+    - filename: The name of the file to save the results.
+    - model: The trained model.
+    - hyperparameters: A dictionary of the model's hyperparameters.
+    - performance_metrics: A dictionary of the model's performance metrics.
+    """
+    performance_metrics = {
+            'MAE Test': metrics[0],
+            'MSE Test': metrics[1],
+            'RMSE Test': metrics[2],
+            'R² Test': metrics[3],
+            'MAE Train': metrics[4],
+            'MSE Train': metrics[5],
+            'RMSE Train': metrics[6],
+            'R² Train': metrics[7]
+        }
+    result = {
+        'Random_Forest': model,
+        'hyperparameters': hyperparameters,
+        'performance_metrics': performance_metrics
+    }
     
-    # Add a main title to the figure
-    fig.suptitle(f'Model: {model_name}', fontsize=16)
-    
-    # Save the table as a PNG image
-    filename='results_'+model_name+'.png'
-    plt.savefig(filename, bbox_inches='tight', dpi=300)
-    plt.close()
+    if not os.path.exists(os.path.dirname(filename)):
+        os.makedirs(os.path.dirname(filename))
+    with open(filename, 'wb') as file:
+        pickle.dump(result, file)
+    print(f"Results saved to {filename}")
+
 
 # Main function to execute the process
 def main():
-    directory = 'data'
-    results_dict = {}
-    estimators_dict = {}
-    model_name = 'Random_Forest'  # Specify the model name here
-    for num_qubit in range(2, 4):  # Loop over qubits 2 to 3
+    dataset = "random"
+    directory = 'data/'+dataset+'_circuits'
+
+    results_dict, results_dict_pca = {}, {}
+    for num_qubit in range(2, 5):  
         data, labels = load_data(directory, num_qubit)
         print(f"Data size for qubit {num_qubit}:", len(data), "Label size:", len(labels))
-        if num_qubit == 2:
-            num_estimators = 15
-        elif num_qubit == 3:
-           num_estimators = 64
-        elif num_qubit == 4:
-           num_estimators = 512
-        results = train_random_forest(data, labels, estimators=num_estimators)
-        results_dict[num_qubit] = results
-        estimators_dict[num_qubit] = num_estimators
-    
-    save_results_as_image(results_dict, estimators_dict, model_name)
+        
+        # Perform PCA on the data
+        transformed_data = perform_pca(data, num_components=10)
+        
+        # Create dictionary to save the results
+        results_dict[num_qubit] = []
+        results_dict_pca[num_qubit] = [] 
+
+        # Get Results over the best hyperparameter found from Grid Search
+        best_hp = hyperparameter_search(data, labels)
+        results = train_random_forest(data, labels, estimators=best_hp["n_estimators"], criterion=best_hp["criterion"], max_features=best_hp["max_features"])
+        results_dict[num_qubit].append(results)
+        save_model_results('experiments/results_'+dataset+f'_qubit_{num_qubit}.pkl', model=results[-1], hyperparameters=best_hp, metrics=results[:-1])
+
+        # Same with PCA preselected feratures
+        best_hp_pca = hyperparameter_search(transformed_data, labels)
+        results_pca = train_random_forest(transformed_data, labels, estimators=best_hp_pca["n_estimators"], criterion=best_hp_pca["criterion"], max_features=best_hp_pca["max_features"]) 
+        results_dict_pca[num_qubit].append(results_pca)  
+        save_model_results('experiments/results_'+dataset+f'_pca_qubit_{num_qubit}.pkl', model=results_pca[-1], hyperparameters=best_hp_pca, metrics=results_pca[:-1])
+
 
 if __name__ == "__main__":
     main()
