@@ -12,7 +12,7 @@ def save_results_as_image():
     
     # Separate files into those with "pca" and those without
     pca_files = [f for f in result_files if 'pca' in f]
-    non_pca_files = [f for f in result_files if 'pca' not in f]
+    non_pca_files = [f for f in result_files if 'pca' not in f and 'time' not in f]
     
     # Function to process files and create images
     def process_files(files, suffix):
@@ -65,9 +65,9 @@ def save_results_as_image():
         plt.close()
 
         plt.figure(figsize=(10, 6))
-        qubits = list(results_dict.keys())
-        mse_train = [results[0][1] for results in results_dict.values()]
-        mse_test = [results[0][2] for results in results_dict.values()]
+        qubits = sorted(results_dict.keys())
+        mse_train = [results_dict[q][0][1] for q in qubits]
+        mse_test = [results_dict[q][0][2] for q in qubits]
 
         plt.scatter(qubits, mse_train, color='blue', label='MSE Train')
         plt.scatter(qubits, mse_test, color='red', label='MSE Test')

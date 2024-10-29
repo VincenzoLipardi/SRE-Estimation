@@ -15,11 +15,12 @@ def load_data(directory, num_qubit):
             # print(filename)
             with open(os.path.join(directory, filename), 'rb') as file:
                 circuit_data = pickle.load(file)
-                # print(circuit_data[0][0].keys())
-                # Assume circuit_data is a tuple (list_of_dicts, label, label)
-                for circuit in circuit_data:
-                    labels.append(circuit[1])
-                    data.append([float(v) for k, v in circuit[0].items() if 'obs_' in k and v is not None])
+                if isinstance(circuit_data[0], tuple):
+                    for circuit in circuit_data:
+                        labels.append(circuit[1])
+                        data.append([float(v) for k, v in circuit[0].items() if 'obs_' in k and v is not None])
+                else:
+                    continue
     return np.array(data), labels
 
 # Function to train Random Forest on data
@@ -57,17 +58,27 @@ def train_random_forest(data, labels, estimators, criterion, max_features):
     return (mean_absolute_error_test, mean_squared_error_test, root_mean_squared_error_test, r_squared_test,
             mean_absolute_error_train, mean_squared_error_train, root_mean_squared_error_train, r_squared_train, rfr)
 
-def perform_pca(data, num_components=4):
+def perform_pca(data, num_qubit, num_components=10):
     """
     Perform PCA on the given data and plot the explained variance ratio.
     
     Parameters:
     - data: The input data for PCA.
+    - num_qubits: number of qubits of the quantum circuits analysed
     - num_components: Number of principal components to keep.
     
     Returns:
     - transformed_data: The data transformed into the principal component space.
     """
+    if num_qubit == 2:
+        num_components = 13
+    elif num_qubit == 3:
+            num_components = 30
+    elif num_qubit == 4:
+            num_components = 55
+    elif num_qubit == 5:
+            num_components = 90
+
     pca = PCA(n_components=num_components)
     transformed_data = pca.fit_transform(data)
     
@@ -79,14 +90,14 @@ def perform_pca(data, num_components=4):
     plt.ylabel('Explained variance ratio')
     plt.xlabel('Principal components')
     plt.title('PCA Explained Variance')
-    plt.savefig("pca.png")
+    plt.savefig(f"pca_{num_qubit}.png")
     
     return transformed_data
 
 def hyperparameter_search(X_train, y_train):
     model = RandomForestRegressor(random_state=1)
     hp_grid = {
-        'n_estimators': [50, 100],  
+        'n_estimators': [100, 200],  
         'max_features': ['sqrt'],  # Avoid 'auto' for small datasets
         'criterion': ['squared_error', 'friedman_mse']   # Avoid 'absolute_error' if unsupported
     }
@@ -134,24 +145,24 @@ def main():
     directory = 'data/'+dataset+'_circuits'
 
     results_dict, results_dict_pca = {}, {}
-    for num_qubit in range(2, 5):  
+    for num_qubit in range(5, 6):  
         data, labels = load_data(directory, num_qubit)
         print(f"Data size for qubit {num_qubit}:", len(data), "Label size:", len(labels))
         
-        # Perform PCA on the data
-        transformed_data = perform_pca(data, num_components=10)
-        
         # Create dictionary to save the results
         results_dict[num_qubit] = []
-        results_dict_pca[num_qubit] = [] 
 
-        # Get Results over the best hyperparameter found from Grid Search
+        """# Get Results over the best hyperparameter found from Grid Search
         best_hp = hyperparameter_search(data, labels)
         results = train_random_forest(data, labels, estimators=best_hp["n_estimators"], criterion=best_hp["criterion"], max_features=best_hp["max_features"])
         results_dict[num_qubit].append(results)
-        save_model_results('experiments/results_'+dataset+f'_qubit_{num_qubit}.pkl', model=results[-1], hyperparameters=best_hp, metrics=results[:-1])
+        save_model_results('experiments/results_'+dataset+f'_qubit_{num_qubit}.pkl', model=results[-1], hyperparameters=best_hp, metrics=results[:-1])"""
 
         # Same with PCA preselected feratures
+        results_dict_pca[num_qubit] = [] 
+        # Perform PCA on the data
+        transformed_data = perform_pca(data, num_qubit)
+
         best_hp_pca = hyperparameter_search(transformed_data, labels)
         results_pca = train_random_forest(transformed_data, labels, estimators=best_hp_pca["n_estimators"], criterion=best_hp_pca["criterion"], max_features=best_hp_pca["max_features"]) 
         results_dict_pca[num_qubit].append(results_pca)  
