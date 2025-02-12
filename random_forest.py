@@ -2,17 +2,29 @@ import os
 import pickle
 import numpy as np
 import matplotlib.pyplot as plt
+import pandas as pd
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.model_selection import train_test_split, GridSearchCV
 from sklearn.metrics import mean_absolute_error, mean_squared_error, root_mean_squared_error, r2_score
 from sklearn.decomposition import PCA
 
 # Function to load data from .pkl files
-def load_data(directory, num_qubit):
+def load_data(directory, num_qubit, training_choice="all"):
     labels, data = [], []
     for filename in os.listdir(directory):
-        if filename.endswith('.pkl') and "qubits_"+str(num_qubit) in filename:
-            # print(filename)
+        if training_choice == "all" :
+             condition = filename.endswith('.pkl') and "qubits_"+str(num_qubit) in filename
+        else:
+            if isinstance (training_choice, str):       
+                condition = filename.endswith('.pkl') and "qubits_"+str(num_qubit) in filename and training_choice in filename
+            elif isinstance(training_choice, int):
+                  condition = filename.endswith('.pkl') and "qubits_"+str(num_qubit) in filename and str(training_choice) in filename
+            else:
+                raise TypeError("training_choice has to be either str or int type")
+
+                  
+        if condition:
+            filename_to_save = filename
             with open(os.path.join(directory, filename), 'rb') as file:
                 circuit_data = pickle.load(file)
                 if isinstance(circuit_data[0], tuple):
@@ -21,7 +33,7 @@ def load_data(directory, num_qubit):
                         data.append([float(v) for k, v in circuit[0].items() if 'obs_' in k and v is not None])
                 else:
                     continue
-    return np.array(data), labels
+    return np.array(data), labels, filename_to_save
 
 # Function to train Random Forest on data
 def train_random_forest(data, labels, estimators, criterion, max_features):
@@ -70,104 +82,125 @@ def perform_pca(data, num_qubit, num_components=10):
     Returns:
     - transformed_data: The data transformed into the principal component space.
     """
+    ticks =2
     if num_qubit == 2:
         num_components = 13
+        ticks = 1
     elif num_qubit == 3:
             num_components = 30
     elif num_qubit == 4:
             num_components = 55
     elif num_qubit == 5:
             num_components = 90
+            ticks = 5
 
     pca = PCA(n_components=num_components)
     transformed_data = pca.fit_transform(data)
+    # features = pca.components_
+    # print(features[0])
     
     # Plot the explained variance ratio
     plt.figure(figsize=(8, 5))
     plt.bar(range(1, num_components + 1), pca.explained_variance_ratio_, alpha=0.5, align='center')
     plt.step(range(1, num_components + 1), np.cumsum(pca.explained_variance_ratio_), where='mid')
-    plt.xticks(ticks=np.arange(1, num_components + 1, 1))  # Set x-axis ticks to integers
+    plt.xticks(ticks=np.arange(1, num_components + 1, ticks))  
     plt.ylabel('Explained variance ratio')
     plt.xlabel('Principal components')
     plt.title('PCA Explained Variance')
-    plt.savefig(f"pca_{num_qubit}.png")
+    plt.savefig(f"experiments/images/pca_{num_qubit}.png")
     
     return transformed_data
 
 def hyperparameter_search(X_train, y_train):
     model = RandomForestRegressor(random_state=1)
     hp_grid = {
-        'n_estimators': [100, 200],  
-        'max_features': ['sqrt'],  # Avoid 'auto' for small datasets
-        'criterion': ['squared_error', 'friedman_mse']   # Avoid 'absolute_error' if unsupported
+        'n_estimators': [250],  
+        'max_features': ['sqrt'],#, 'log2'], 
+        'criterion': ['squared_error', 'friedman_mse'],#, 'absolute_error'],
+        # 'max_depth': [None, 10, 20, 30],
+        # 'min_samples_split': [2, 5, 10],
+        #'min_samples_leaf': [1, 2, 4]
     }
     GSCV = GridSearchCV(estimator=model, param_grid=hp_grid, cv=3)
     GSCV.fit(X_train, y_train)
-    # print("Best params:", GSCV.best_params_)
+    print("Best params:", GSCV.best_params_)
     return GSCV.best_params_
 
-def save_model_results(filename, model, hyperparameters, metrics):
+def save_dataframe(filename, model, pca, dataset, hyperparameters, metrics):
     """
     Save the model results to a .pkl file.
 
     Parameters:
     - filename: The name of the file to save the results.
     - model: The trained model.
+    - pca: boolean. 
+    - dataset: The dataset used for training.
     - hyperparameters: A dictionary of the model's hyperparameters.
-    - performance_metrics: A dictionary of the model's performance metrics.
+    - metrics: A tuple of the model's performance metrics.
     """
     performance_metrics = {
-            'MAE Test': metrics[0],
-            'MSE Test': metrics[1],
-            'RMSE Test': metrics[2],
-            'R² Test': metrics[3],
-            'MAE Train': metrics[4],
-            'MSE Train': metrics[5],
-            'RMSE Train': metrics[6],
-            'R² Train': metrics[7]
-        }
+        'MAE Test': metrics[0],
+        'MSE Test': metrics[1],
+        'RMSE Test': metrics[2],
+        'R² Test': metrics[3],
+        'MAE Train': metrics[4],
+        'MSE Train': metrics[5],
+        'RMSE Train': metrics[6],
+        'R² Train': metrics[7]
+    }
     result = {
-        'Random_Forest': model,
+        'Model': model,
+        "pca": pca,
+        'Dataset': dataset,
         'hyperparameters': hyperparameters,
         'performance_metrics': performance_metrics
     }
-    
-    if not os.path.exists(os.path.dirname(filename)):
-        os.makedirs(os.path.dirname(filename))
-    with open(filename, 'wb') as file:
-        pickle.dump(result, file)
-    print(f"Results saved to {filename}")
+
+    # Create a DataFrame from the result
+    result_df = pd.DataFrame([result])
+
+    # Check if the file exists
+    if os.path.exists(filename):
+        # Load existing DataFrame
+        existing_df = pd.read_pickle(filename)
+        # Append the new result
+        updated_df = pd.concat([existing_df, result_df], ignore_index=True)
+    else:
+        # If file doesn't exist, use the new DataFrame
+        updated_df = result_df
+
+    # Save the updated DataFrame to the file
+    updated_df.to_pickle(filename)
+    print(f"Data successfully save in {filename}")
+
+def save_model(data_type, pca, num_qubit, gates_set, data, labels):
+    filename = f'experiments/results_{data_type}_qubit_{num_qubit}.pkl'
+     # Get Results over the best hyperparameter found from Grid Search
+    best_hp = hyperparameter_search(data, labels)
+    results = train_random_forest(data, labels, estimators=best_hp["n_estimators"], criterion=best_hp["criterion"], max_features=best_hp["max_features"])
+    save_dataframe(filename=filename, model=results[-1], pca=pca, dataset=f"qubit_{num_qubit}_gates_{gates_set}", hyperparameters=best_hp, metrics=results[:-1])
 
 
 # Main function to execute the process
 def main():
-    dataset = "random"
-    directory = 'data/'+dataset+'_circuits'
+    data_type = "random"
+    directory = 'data/'+data_type+'_circuits'
 
-    results_dict, results_dict_pca = {}, {}
-    for num_qubit in range(5, 6):  
-        data, labels = load_data(directory, num_qubit)
-        print(f"Data size for qubit {num_qubit}:", len(data), "Label size:", len(labels))
-        
-        # Create dictionary to save the results
-        results_dict[num_qubit] = []
+    training_choices = [19, 39, 59, 79, 99]
+    for num_qubit in range(2, 7):
+        for training_choice in training_choices:
+            data, labels, filename = load_data(directory, num_qubit, training_choice)
 
-        """# Get Results over the best hyperparameter found from Grid Search
-        best_hp = hyperparameter_search(data, labels)
-        results = train_random_forest(data, labels, estimators=best_hp["n_estimators"], criterion=best_hp["criterion"], max_features=best_hp["max_features"])
-        results_dict[num_qubit].append(results)
-        save_model_results('experiments/results_'+dataset+f'_qubit_{num_qubit}.pkl', model=results[-1], hyperparameters=best_hp, metrics=results[:-1])"""
+            gates_set = filename.split("gates_")[-1].split('.')[0]
+            print(f"Data size for qubit {num_qubit} and gates {gates_set}:", len(data), "Label size:", len(labels))
 
-        # Same with PCA preselected feratures
-        results_dict_pca[num_qubit] = [] 
-        # Perform PCA on the data
-        transformed_data = perform_pca(data, num_qubit)
-
-        best_hp_pca = hyperparameter_search(transformed_data, labels)
-        results_pca = train_random_forest(transformed_data, labels, estimators=best_hp_pca["n_estimators"], criterion=best_hp_pca["criterion"], max_features=best_hp_pca["max_features"]) 
-        results_dict_pca[num_qubit].append(results_pca)  
-        save_model_results('experiments/results_'+dataset+f'_pca_qubit_{num_qubit}.pkl', model=results_pca[-1], hyperparameters=best_hp_pca, metrics=results_pca[:-1])
-
-
+            models = ["Random_Forest", "pca"]
+            for model in models:
+                pca = False
+                if model == "pca":
+                    data = perform_pca(data, num_qubit)
+                    pca = True
+                save_model(data_type, pca, num_qubit, gates_set, data, labels)
+                 
 if __name__ == "__main__":
     main()

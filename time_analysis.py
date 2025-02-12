@@ -45,29 +45,36 @@ def calculate_prediction_time(num_qubit, dataset="random", model_directory='expe
 
 
 # Initialize a list to store the results
-results = []
+
 
 # Loop through different numbers of qubits
-for num_qubit in range(2, 6):
-    prediction_time, entropy_time = calculate_prediction_time(num_qubit=num_qubit, dataset="random")
-    results.append({'rf_time': prediction_time, 'sre_time': entropy_time, 'num_qubit': num_qubit})
+def create_pkl(min_qubits, max_qubits):
+    results = []
+    for num_qubit in range(2, 6):
+        prediction_time, entropy_time = calculate_prediction_time(num_qubit=num_qubit, dataset="random")
+        results.append({'rf_time': prediction_time, 'sre_time': entropy_time, 'num_qubit': num_qubit})
 
-# Create a DataFrame from the results
-df = pd.DataFrame(results)
+    # Create a DataFrame from the results
+    df = pd.DataFrame(results)
 
-# Save the DataFrame to a .pkl file
-df.to_pickle('experiments/prediction_entropy_times.pkl')
-print("File saved with times in milliseconds")
+    # Save the DataFrame to a .pkl file
+    df.to_pickle('experiments/prediction_entropy_times.pkl')
+    print("File saved with times in milliseconds")
+    
+# Load the results from the .pkl file
+results = pd.read_pickle('experiments/prediction_entropy_times.pkl')
 
 # Plotting the results
 plt.figure(figsize=(10, 6))
-plt.bar(df['num_qubit'], df['rf_time'], width=0.4, label='Random Forest Prediction Time (ms)', color='blue', align='center')
-plt.bar(df['num_qubit'] + 0.4, df['sre_time'], width=0.4, label='Stabilizer Renyi Entropy Time (ms)', color='orange', align='center')
+plt.bar(results['num_qubit'], results['rf_time'], width=0.4, label='Random Forest Prediction Time (ms)', color='blue', align='center')
+plt.bar(results['num_qubit'] + 0.4, results['sre_time'], width=0.4, label='Stabilizer Renyi Entropy Time (ms)', color='orange', align='center')
 
 plt.xlabel('Number of Qubits')
 plt.ylabel('Time (ms)')
+plt.yscale('log')
+
 plt.title('Prediction and Entropy Calculation Times')
-plt.xticks(df['num_qubit'] + 0.2, df['num_qubit'])
+plt.xticks(results['num_qubit'] + 0.2, results['num_qubit'])
 plt.legend()
 plt.grid(axis='y')
 

@@ -64,11 +64,10 @@ def plot_combined_histograms(directory, qubit_range):
 
 if __name__ == "__main__":
     directory = 'data/random_circuits'
-    for num_qubits in range(2, 6):
+    qubit_range = range(2, 7)
+    for num_qubits in qubit_range:
         entropy_data = load_entropy_data(directory, num_qubits)
         plot_histograms(entropy_data, num_qubits)
     
     # Plot combined histograms
-    """qubit_range = range(2, 6)
     plot_combined_histograms(directory, qubit_range)
-"""

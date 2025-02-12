@@ -25,13 +25,15 @@ Main Libraries needed:
 
 ## Usage
 
-Generate data if they do not appear in [directory](data)
-1. Run [file](data_generation.py) to generate the initial dataset of quantum circuits.
-2. Run [file](feature.py)to calculate classical shadows and add them to the dataset.
+Generate data if they do not appear in [directory](data/random_circuits/)
+1. Run [circuit_generation.py](circuit_generation.py) to generate the initial dataset of quantum circuits.
+2. Run [feature.py](feature.py) to calculate classical shadows as classical features and add them to the dataset.
+3. Run [dag_encoding.py](dag_encoding.py)to add the directed acyclic graph representation of quantum circuits to the dataset.
+4. Run [label.py](label.py) to label the quantum circuits of the dataset.
+In repository data there is a tutorial [data/tutorial_data.ipynb](data/tutorial_data.ipynb)you can follow to get familiar with the dataset
 
 Train Machine Learnign model:
 [Random Forests](random_forest.py) 
 
 ## License
-
 This project is licensed under the MIT License - see the LICENSE file for details.

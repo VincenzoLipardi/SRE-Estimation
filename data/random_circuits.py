@@ -93,9 +93,9 @@ def random_quantum_circuit(num_qubits, num_gates, basis_gates):
     return qasm_str
 
 # Function to generate random circuits within a range of qubits and gates and save them
-def generate_and_save_circuits(num_qubits, gate_range, num_circuits, basis_gates):
+def generate_and_save_circuits(directory, num_qubits, gate_range, num_circuits, basis_gates):
     # Create a directory for saving the QASM files
-    os.makedirs("data", exist_ok=True)
+    os.makedirs(directory, exist_ok=True)
     
     circuits = []
     for i in range(num_circuits):
@@ -114,13 +114,20 @@ def generate_and_save_circuits(num_qubits, gate_range, num_circuits, basis_gates
     # Dynamically create the filename based on the ranges
     filename = f"random_circuits_basis_{basis_gates}_qubits_{num_qubits}_gates_{gate_range[0]}-{gate_range[1]-1}.pkl"
     
-    # Save the generated circuits to a .pkl file in the 'data' directory
-    filepath = os.path.join('data', filename)
+    # Save the generated circuits to a .pkl file in the 'data/directory' directory
+    filepath = os.path.join(directory, filename)
+    
+    # Check if the file already exists
+    if os.path.exists(filepath):
+        print(f"File {filepath} already exists")
+        return filepath
+    
     with open(filepath, 'wb') as f:
         pickle.dump(circuits, f)
     print(f"Saved {num_circuits} random quantum circuits to {filepath}")
     
     return filepath
+
 def pennylane_circuit_from_qasm(qasm_str, num_qubits):
     dev = qml.device('default.qubit', wires=num_qubits)  # Assuming max 10 qubits, adjust if needed
     
@@ -136,10 +143,12 @@ def qiskit_circuit_from_qasm(qasm_str, num_qubits):
     qc = QuantumCircuit.from_qasm_str(qasm_str)
     return qc
 
-# Data generatio
-num_circuits = 10000     # Number of circuits to generate
-basis_gates = "rotations+cx"
-# Generate and save random circuits
-for i in range(2,6):
-    for j in range(5):
-        saved_filepath = generate_and_save_circuits(num_qubits=i, gate_range=(20*j, 20*(j+1)), num_circuits=num_circuits, basis_gates=basis_gates)
+if __name__ == "__main__":
+
+    directory = "dataset_random"
+    num_circuits = 10000     
+    basis_gates = "rotations+cx"
+
+    for i in range(2,6):
+        for j in range(5):
+            saved_filepath = generate_and_save_circuits(directory, num_qubits=i, gate_range=(20*j, 20*(j+1)), num_circuits=num_circuits, basis_gates=basis_gates)

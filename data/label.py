@@ -1,5 +1,4 @@
 import pickle
-import pennylane as qml
 import numpy as np
 from itertools import product
 from tqdm import tqdm
@@ -39,7 +38,7 @@ def calculate_stabilizer_renyi_entropy_qiskit(circuit, alpha=2):
     return entropy
 
 if __name__ == "__main__":
-    qubit_ranges = range(2,6)
+    qubit_ranges = range(6, 7)
     gate_ranges = [(0, 19), (20, 39), (40, 59), (60, 79), (80, 99)]
     
     for num_qubit in qubit_ranges:
