@@ -92,6 +92,43 @@ def random_quantum_circuit(num_qubits, num_gates, basis_gates):
     
     return qasm_str
 
+def trotterized_ising_circuits(num_qubits, trotterization_steps):
+    # Define a device with the given number of qubits
+    dev = qml.device('lightning.qubit', wires=num_qubits)
+
+    # Define a quantum node (qnode)
+    @qml.qnode(dev)
+    def circuit():
+        # Initialize the qubits in the |+> state
+        for i in range(num_qubits):
+            qml.Hadamard(wires=i)
+        
+        # Apply Trotterized Ising model evolution
+        for _ in range(trotterization_steps):
+            # Apply ZZ interactions
+            for i in range(num_qubits - 1):
+                qml.CNOT(wires=[i, i + 1])
+                qml.RZ(0.1, wires=i + 1)  # Example interaction strength
+                qml.CNOT(wires=[i, i + 1])
+            
+            # Apply local X rotations
+            for i in range(num_qubits):
+                qml.RX(0.1, wires=i)  # Example rotation angle
+
+        return qml.state()  # Return the statevector of the quantum system
+
+    # Construct the circuit
+    circuit.construct([], {})
+    
+    # Convert to OpenQASM
+    qasm_str = circuit.qtape.to_openqasm()
+    
+    # Remove the measurement and classical bits from the QASM string
+    qasm_lines = qasm_str.split('\n')
+    qasm_str = '\n'.join([line for line in qasm_lines if not line.startswith('creg') and not line.startswith('measure')])
+    
+    return qasm_str
+
 # Function to generate random circuits within a range of qubits and gates and save them
 def generate_and_save_circuits(directory, num_qubits, gate_range, num_circuits, basis_gates):
     # Create a directory for saving the QASM files
@@ -112,7 +149,7 @@ def generate_and_save_circuits(directory, num_qubits, gate_range, num_circuits, 
         })
     
     # Dynamically create the filename based on the ranges
-    filename = f"random_circuits_basis_{basis_gates}_qubits_{num_qubits}_gates_{gate_range[0]}-{gate_range[1]-1}.pkl"
+    filename = f"basis_{basis_gates}_qubits_{num_qubits}_gates_{gate_range[0]}-{gate_range[1]-1}.pkl"
     
     # Save the generated circuits to a .pkl file in the 'data/directory' directory
     filepath = os.path.join(directory, filename)
@@ -145,7 +182,7 @@ def qiskit_circuit_from_qasm(qasm_str, num_qubits):
 
 if __name__ == "__main__":
 
-    directory = "dataset_random"
+    directory = "data/dataset_random"
     num_circuits = 10000     
     basis_gates = "rotations+cx"
 

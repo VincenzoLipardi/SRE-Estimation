@@ -102,7 +102,7 @@ if __name__ == "__main__":
     
     for num_qubit in qubit_ranges:
         for gate_range in tqdm(gate_ranges, desc="Gate Ranges", leave=False):
-            filename = f"random_circuits/basis_rotations+cx_qubits_{num_qubit}_gates_{gate_range[0]}-{gate_range[1]}.pkl"
+            filename = f"data/dataset_random/basis_rotations+cx_qubits_{num_qubit}_gates_{gate_range[0]}-{gate_range[1]}.pkl"
             # Load circuits from pkl file
             circuits = load_circuits(filename)
             if isinstance(circuits[0], dict):

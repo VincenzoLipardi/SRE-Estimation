@@ -38,17 +38,18 @@ def calculate_stabilizer_renyi_entropy_qiskit(circuit, alpha=2):
     return entropy
 
 if __name__ == "__main__":
-    qubit_ranges = range(6, 7)
+    qubit_ranges = range(2, 5)
     gate_ranges = [(0, 19), (20, 39), (40, 59), (60, 79), (80, 99)]
     
     for num_qubit in qubit_ranges:
         for gate_range in tqdm(gate_ranges, desc="Gate Ranges", leave=False):
-            filename = f"random_circuits/basis_rotations+cx_qubits_{num_qubit}_gates_{gate_range[0]}-{gate_range[1]}.pkl"
+            filename = f"data/dataset_random/basis_rotations+cx_qubits_{num_qubit}_gates_{gate_range[0]}-{gate_range[1]}.pkl"
 
             with open(filename, 'rb') as file:
                 data = pickle.load(file)
 
             result = []
+
             num_qubits = data[0]['num_qubits']
             wire_labels = list(range(num_qubits))
 
