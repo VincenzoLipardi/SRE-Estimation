@@ -29,7 +29,7 @@ def calculate_prediction_time(num_qubit, dataset="random", model_directory='expe
     prediction_time = (end_time - start_time) * 1000 / 2
     
     # Stabilizer Renyi entropy
-    circuit_filename = f'data/random_circuits/basis_rotations+cx_qubits_{num_qubit}_gates_40-59.pkl'
+    circuit_filename = f'random_circuits/basis_rotations+cx_qubits_{num_qubit}_gates_40-59.pkl'
     with open(circuit_filename, 'rb') as file:
         circuit_data = pickle.load(file)
     qasm_str = circuit_data[sampled[0] % 10000][0]['qasm']

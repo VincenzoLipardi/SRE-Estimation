@@ -1,5 +1,6 @@
 import pickle
 import numpy as np
+import os
 from itertools import product
 from tqdm import tqdm
 from qiskit import QuantumCircuit
@@ -38,15 +39,23 @@ def calculate_stabilizer_renyi_entropy_qiskit(circuit, alpha=2):
     return entropy
 
 if __name__ == "__main__":
+    # Define parent directory
+    base_dir = os.getenv('BASE_DIR', 'data/')  
     qubit_ranges = range(2, 5)
     gate_ranges = [(0, 19), (20, 39), (40, 59), (60, 79), (80, 99)]
     
     for num_qubit in qubit_ranges:
         for gate_range in tqdm(gate_ranges, desc="Gate Ranges", leave=False):
-            filename = f"data/dataset_random/basis_rotations+cx_qubits_{num_qubit}_gates_{gate_range[0]}-{gate_range[1]}.pkl"
+            print("Qubit: ", num_qubit, "Gates: ", gate_range)
+            filename = f"{base_dir}dataset_random/basis_rotations+cx_qubits_{num_qubit}_gates_{gate_range[0]}-{gate_range[1]}.pkl"
 
             with open(filename, 'rb') as file:
                 data = pickle.load(file)
+            
+            # Check if the data is already processed
+            if isinstance(data[0], tuple) and len(data[0]) == 2:
+                print(f"File {filename} already processed. Skipping...")
+                continue
 
             result = []
 
@@ -65,7 +74,7 @@ if __name__ == "__main__":
                     # Create a list of tuples
                     result.append((circuit, calculate_stabilizer_renyi_entropy_qiskit(qiskit_circuit)))
             # Save the updated data back to the original .pkl file
-            print(result)
+            # print(result)
             with open(filename, 'wb') as file:
                 pickle.dump(result, file)
             print(f"Updated {len(result)} circuits with global expectation values and saved")
