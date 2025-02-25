@@ -9,20 +9,19 @@ from sklearn.metrics import mean_absolute_error, mean_squared_error, root_mean_s
 from sklearn.decomposition import PCA
 
 # Function to load data from .pkl files
-def load_data(directory, num_qubit, training_choice="all"):
+def load_data(directory, num_qubit, dataset_limited="all"):
     labels, data = [], []
+    filename_to_save = None  # Initialize with a default value
     for filename in os.listdir(directory):
-        if training_choice == "all" :
-             condition = filename.endswith('.pkl') and "qubits_"+str(num_qubit) in filename
-        else:
-            if isinstance (training_choice, str):       
-                condition = filename.endswith('.pkl') and "qubits_"+str(num_qubit) in filename and training_choice in filename
-            elif isinstance(training_choice, int):
-                  condition = filename.endswith('.pkl') and "qubits_"+str(num_qubit) in filename and str(training_choice) in filename
+        if dataset_limited is not False:
+            if isinstance(dataset_limited, str):
+                condition = filename.endswith('.pkl') and "qubits_" + str(num_qubit) in filename and dataset_limited in filename
+            elif isinstance(dataset_limited, int):
+                condition = filename.endswith('.pkl') and "qubits_" + str(num_qubit) in filename and str(dataset_limited) in filename
             else:
-                raise TypeError("training_choice has to be either str or int type")
-
-                  
+                raise TypeError("dataset_limited has to be or str or int type. Or, pick False if you want to study the entire dataset")
+        else:
+            condition = filename.endswith('.pkl') and "qubits_" + str(num_qubit) in filename
         if condition:
             filename_to_save = filename
             with open(os.path.join(directory, filename), 'rb') as file:
@@ -33,6 +32,10 @@ def load_data(directory, num_qubit, training_choice="all"):
                         data.append([float(v) for k, v in circuit[0].items() if 'obs_' in k and v is not None])
                 else:
                     continue
+
+    if filename_to_save is None:
+        raise ValueError("No files matched the condition.")
+
     return np.array(data), labels, filename_to_save
 
 # Function to train Random Forest on data
@@ -171,28 +174,39 @@ def save_dataframe(filename, model, pca, dataset, hyperparameters, metrics):
 
     # Save the updated DataFrame to the file
     updated_df.to_pickle(filename)
-    print(f"Data successfully save in {filename}")
+    print(f"Data successfully saved in {filename}")
 
-def save_model(data_type, pca, num_qubit, gates_set, data, labels):
-    filename = f'experiments/results_{data_type}_qubit_{num_qubit}.pkl'
+def save_model(dataset_name, pca, num_qubit, gates_set, data, labels):
+    filename = f'experiments/results_{dataset_name}_qubit_{num_qubit}.pkl'
      # Get Results over the best hyperparameter found from Grid Search
     best_hp = hyperparameter_search(data, labels)
     results = train_random_forest(data, labels, estimators=best_hp["n_estimators"], criterion=best_hp["criterion"], max_features=best_hp["max_features"])
-    save_dataframe(filename=filename, model=results[-1], pca=pca, dataset=f"qubit_{num_qubit}_gates_{gates_set}", hyperparameters=best_hp, metrics=results[:-1])
+    dataset_limit = ""
+    if dataset_name =="random":
+        dataset_limit = "gates"
+    elif dataset_name == "tim":
+        dataset_limit ="trotter_steps"
+
+    save_dataframe(filename=filename, model=results[-1], pca=pca, dataset=f"{dataset_limit}_{gates_set}", hyperparameters=best_hp, metrics=results[:-1])
 
 
 # Main function to execute the process
 def main():
-    data_type = "random"
-    directory = 'data/'+data_type+'_circuits'
+    dataset_name = "tim"
+    directory = 'data/dataset_'+dataset_name
 
-    training_choices = [19, 39, 59, 79, 99]
-    for num_qubit in range(2, 7):
-        for training_choice in training_choices:
+    # Choose keywords to have in the dataset file to be studied
+    #dataset_limited = [19,39,59]
+    dataset_limited = [1,2,3,4,5]
+
+    for num_qubit in range(2, 5):
+        for training_choice in dataset_limited:
             data, labels, filename = load_data(directory, num_qubit, training_choice)
-
-            gates_set = filename.split("gates_")[-1].split('.')[0]
-            print(f"Data size for qubit {num_qubit} and gates {gates_set}:", len(data), "Label size:", len(labels))
+            if dataset_name=="random":
+                gates_set = filename.split("gates_")[-1].split('.')[0]
+                print(f"\Data size for qubit {num_qubit} and gates {gates_set}:", len(data), "Label size:", len(labels))
+            else:
+                gates_set = gates_set = filename.split("trotter_")[-1].split('.')[0]
 
             models = ["Random_Forest", "pca"]
             for model in models:
@@ -200,7 +214,7 @@ def main():
                 if model == "pca":
                     data = perform_pca(data, num_qubit)
                     pca = True
-                save_model(data_type, pca, num_qubit, gates_set, data, labels)
+                save_model(dataset_name, pca, num_qubit, gates_set, data, labels)
                  
 if __name__ == "__main__":
     main()

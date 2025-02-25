@@ -92,7 +92,7 @@ def random_quantum_circuit(num_qubits, num_gates, basis_gates):
     
     return qasm_str
 
-def trotterized_ising_circuits(num_qubits, trotterization_steps):
+def trotterized_ising_circuits(num_qubits, trotterization_steps, rx_angle):
     # Define a device with the given number of qubits
     dev = qml.device('lightning.qubit', wires=num_qubits)
 
@@ -108,12 +108,14 @@ def trotterized_ising_circuits(num_qubits, trotterization_steps):
             # Apply ZZ interactions
             for i in range(num_qubits - 1):
                 qml.CNOT(wires=[i, i + 1])
-                qml.RZ(0.1, wires=i + 1)  # Example interaction strength
+                # Ensure RZ angle is less than RX angle
+                rz_angle = np.random.uniform(0, rx_angle)
+                qml.RZ(rz_angle, wires=i + 1)
                 qml.CNOT(wires=[i, i + 1])
             
-            # Apply local X rotations
+            # Apply local X rotations with the input RX angle
             for i in range(num_qubits):
-                qml.RX(0.1, wires=i)  # Example rotation angle
+                qml.RX(rx_angle, wires=i)
 
         return qml.state()  # Return the statevector of the quantum system
 
@@ -129,29 +131,49 @@ def trotterized_ising_circuits(num_qubits, trotterization_steps):
     
     return qasm_str
 
-# Function to generate random circuits within a range of qubits and gates and save them
-def generate_and_save_circuits(directory, num_qubits, gate_range, num_circuits, basis_gates):
+# Function to generate random circuits or Ising model circuits within a range of qubits and gates and save them
+def generate_and_save_circuits(directory, num_qubits, num_circuits, basis_gates, circuit_type='random', gate_range=None, trotterization_steps=1, rx_angle=0.1):
     # Create a directory for saving the QASM files
     os.makedirs(directory, exist_ok=True)
     
     circuits = []
-    for i in range(num_circuits):
-        # Randomly select the number of qubits and gates from the given ranges
+    if circuit_type == 'random':
+        if gate_range is None:
+            raise ValueError("gate_range must be provided for random circuits")
+        for _ in range(num_circuits):
+            # Randomly select the number of gates from the given range
+            num_gates = random.randint(gate_range[0], gate_range[1])
+            # Generate the random quantum circuit and get the QASM string
+            qasm_str = random_quantum_circuit(num_qubits, num_gates, basis_gates)
+            circuits.append({
+                'qasm': qasm_str,
+                'num_qubits': num_qubits,
+                'num_gates': num_gates
+            })
+    elif circuit_type == 'ising':
+        for _ in range(num_circuits):
+            # Generate a random RX angle in the range [0, 2π]
+            random_rx_angle = np.random.uniform(0, 2 * np.pi)
+            # Generate the Trotterized Ising circuit and get the QASM string
+            qasm_str = trotterized_ising_circuits(num_qubits, trotterization_steps, random_rx_angle)
+            circuits.append({
+                'qasm': qasm_str,
+                'num_qubits': num_qubits,
+                'h': 'random',  # Use 'random' to indicate RX angles are random
+                'J': 'random'   # Placeholder for RZ angle, as it is random
+            })
+    else:
+        raise ValueError(f"Invalid circuit type: {circuit_type}")
 
-        num_gates = random.randint(gate_range[0], gate_range[1])
-        
-        # Generate a random quantum circuit and get the QASM string
-        qasm_str = random_quantum_circuit(num_qubits, num_gates, basis_gates)
-        circuits.append({
-            'qasm': qasm_str,
-            'num_qubits': num_qubits,
-            'num_gates': num_gates
-        })
+    # Define the filename based on the circuit type
+    if circuit_type == 'random':
+        filename = f"{circuit_type}_basis_{basis_gates}_qubits_{num_qubits}_gates_{gate_range[0]}-{gate_range[1]-1}.pkl"
+    elif circuit_type == 'ising':
+        filename = f"ising_qubits_{num_qubits}_trotter_{trotterization_steps}.pkl"
+
+    # Ensure the directory exists
+    os.makedirs(directory, exist_ok=True)
     
-    # Dynamically create the filename based on the ranges
-    filename = f"basis_{basis_gates}_qubits_{num_qubits}_gates_{gate_range[0]}-{gate_range[1]-1}.pkl"
-    
-    # Save the generated circuits to a .pkl file in the 'data/directory' directory
     filepath = os.path.join(directory, filename)
     
     # Check if the file already exists
@@ -161,7 +183,7 @@ def generate_and_save_circuits(directory, num_qubits, gate_range, num_circuits, 
     
     with open(filepath, 'wb') as f:
         pickle.dump(circuits, f)
-    print(f"Saved {num_circuits} random quantum circuits to {filepath}")
+    print(f"Saved {num_circuits} {circuit_type} quantum circuits to {filepath}")
     
     return filepath
 
@@ -180,12 +202,47 @@ def qiskit_circuit_from_qasm(qasm_str, num_qubits):
     qc = QuantumCircuit.from_qasm_str(qasm_str)
     return qc
 
+def generate_random_circuits():
+    random.seed(0)
+    random_directory = "dataset_random"
+    random_num_circuits = 10000
+    random_basis_gates = "rotations+cx"
+    ranges = [(0, 19), (20, 39), (40, 59), (60, 79), (80, 99)]
+
+    for start, end in ranges:
+        random_gate_range = (start, end)
+        filename_suffix = f"{start}-{end}"
+        for i in range(2, 7):  # Loop over the number of qubits
+            saved_filepath_random = generate_and_save_circuits(
+                random_directory,
+                num_qubits=i,
+                num_circuits=random_num_circuits,
+                basis_gates=random_basis_gates,
+                circuit_type='random',
+                gate_range=random_gate_range
+            )
+
+def generate_ising_circuits():
+    ising_directory = "dataset_tim"
+    ising_num_circuits = 1000
+    ising_rx_angle = 0.1
+
+    for i in range(2, 7):
+        for j in range(1, 6):
+            saved_filepath_ising = generate_and_save_circuits(
+                ising_directory,
+                num_qubits=i,
+                num_circuits=ising_num_circuits,
+                basis_gates="rotations+cx",  # Assuming same basis for consistency
+                circuit_type='ising',
+                trotterization_steps=j,
+                rx_angle=ising_rx_angle
+            )
+
 if __name__ == "__main__":
+    # Choose which type of circuits to generate
+    #generate_random_circuits()
+    generate_ising_circuits()
 
-    directory = "data/dataset_random"
-    num_circuits = 10000     
-    basis_gates = "rotations+cx"
 
-    for i in range(2,6):
-        for j in range(5):
-            saved_filepath = generate_and_save_circuits(directory, num_qubits=i, gate_range=(20*j, 20*(j+1)), num_circuits=num_circuits, basis_gates=basis_gates)
+

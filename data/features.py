@@ -93,20 +93,14 @@ def qasm_to_dag(qasm_str):
     dag = circuit_to_dag(circuit)
     return dag
 
-
-
-if __name__ == "__main__":
-
-    qubit_ranges = range(2, 6)
-    gate_ranges = [(0, 19), (20, 39), (40, 59), (60, 79), (80, 99)]
-    
+def process_circuits(qubit_ranges=range(7, 9), gate_ranges=[(0, 19), (20, 39), (40, 59), (60, 79), (80, 99)]):
     for num_qubit in qubit_ranges:
         for gate_range in tqdm(gate_ranges, desc="Gate Ranges", leave=False):
-            filename = f"data/dataset_random/basis_rotations+cx_qubits_{num_qubit}_gates_{gate_range[0]}-{gate_range[1]}.pkl"
+            filename = f"dataset_random/basis_rotations+cx_qubits_{num_qubit}_gates_{gate_range[0]}-{gate_range[1]}.pkl"
             # Load circuits from pkl file
             circuits = load_circuits(filename)
             if isinstance(circuits[0], dict):
-            # Check if any column in circuits starts with "obs"
+                # Check if any column in circuits starts with "obs"
                 has_obs_column = any(key.startswith("obs_") for circuit in circuits for key in circuit.keys())
                 if has_obs_column:
                     print(f"Skipping {filename}: Observable columns already present")
@@ -141,4 +135,55 @@ if __name__ == "__main__":
             # Save the updated circuit data to a new pickle file
             save_updated_circuits(filename, circuits)
         
-print(f"Dataset successfully generated and saved to {filename}")
+    print(f"Dataset successfully generated and saved to {filename}")
+
+def process_ising_circuits(min_qubit=2, max_qubit=7, min_trotter_step=1, max_trotter_step=6):
+    qubit_ranges = range(min_qubit, max_qubit)  # Adjust as needed
+    trotterization_steps_range = range(min_trotter_step, max_trotter_step)  # Adjust as needed
+    
+    for num_qubit in qubit_ranges:
+        for trotter_steps in tqdm(trotterization_steps_range, desc="Trotterization Steps", leave=False):
+            filename = f"dataset_tim/ising_qubits_{num_qubit}_trotter_{trotter_steps}.pkl"
+            # Load circuits from pkl file
+            circuits = load_circuits(filename)
+            if isinstance(circuits[0], dict):
+                # Check if any column in circuits starts with "obs"
+                has_obs_column = any(key.startswith("obs_") for circuit in circuits for key in circuit.keys())
+                if has_obs_column:
+                    print(f"Skipping {filename}: Observable columns already present")
+                    continue
+                print(f"Processing {filename}: Adding observable columns")
+
+                # From qasm to pennylane circuits
+                pennylane_circuits = [qml.from_qasm(circuit['qasm']) for circuit in circuits]
+                dag_circuits = [qasm_to_dag(circuit['qasm']) for circuit in circuits]
+
+                # Create set of observables whose expectation value on the circuits constitute our designed features 
+                list_observables = generate_pauli_observables(n_qubits=num_qubit, max_qubits=2)
+
+                for i, circuit_data in enumerate(tqdm(circuits, desc="Circuits", leave=False)):
+                    circuit_func = pennylane_circuits[i]
+                    circuit_data["dag"] = dag_circuits[i]
+                    
+                    # Extract wire labels directly from the QASM string or circuit data
+                    wire_labels = list(range(circuit_data["num_qubits"]))  # Assumes qubits are indexed from 0 to num_qubits-1
+                    
+                    # Define a local Pauli observable, e.g., PauliZ on qubit 0
+                    for observable in list_observables:
+                        observable_name = f"obs_{observable}"
+                        
+                        # Compute the expectation value of the specified observable
+                        estimated_expectation = compute_classical_shadow_expectation(
+                            circuit_func, wire_labels=wire_labels, observable=observable
+                        )
+                        # Add the expectation value to the circuit's data dictionary with the descriptive column name
+                        circuit_data[observable_name] = estimated_expectation
+            
+            # Save the updated circuit data to a new pickle file
+            save_updated_circuits(filename, circuits)
+        
+    print(f"Dataset successfully generated and saved to {filename}")
+
+if __name__ == "__main__":
+    # process_circuits()
+    process_ising_circuits()
