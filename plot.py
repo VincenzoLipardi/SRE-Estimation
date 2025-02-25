@@ -2,25 +2,27 @@ import os
 import pandas as pd
 import matplotlib.pyplot as plt
 
-def save_results_as_image(model, pca, gates):
+def save_results_as_image(model, data, pca, gates):
     # Directory containing the .pkl files
     directory = 'experiments'
     
     # List all .pkl files in the directory
-    result_files = [f for f in os.listdir(directory) if f.endswith('.pkl') and "time" not in f]
-    
+    result_files = [f for f in os.listdir(directory) if f.endswith('.pkl') and data in f and "time" not in f]
+    # print(result_files)
     # Function to process files and create images
     def read_file(file, pca, gates):
         with open(os.path.join(directory, file), 'rb') as file_obj:
             df = pd.read_pickle(file_obj)
-        
+        print(df.shape)
+        # print(df.columns)
+
         qubit = int(file.split('_')[-1].replace('.pkl', ''))
         filtered_df = df[(df['pca'] == pca) & (df['Dataset'].str.contains(str(gates)))]
-
-        if filtered_df.shape[0] !=1:
-            raise ValueError("More than one model has beeen chosen to be plotted")
-
-        metrics = filtered_df["performance_metrics"][0]
+        print("Filtered DataFrame shape:", filtered_df.shape)
+        print("Filtered DataFrame contents:\n", filtered_df)
+        if filtered_df.shape[0] != 1:
+            raise ValueError("More than one model has been chosen to be plotted")
+        metrics = filtered_df["performance_metrics"]
         return qubit, metrics
 
     results_for_qubits = {}
@@ -45,12 +47,13 @@ def save_results_as_image(model, pca, gates):
     plt.legend()
     plt.xticks(qubits)
     
-    scatter_filename = f'experiments/images/mse_scatter_{model}_{gates}.png'
+    scatter_filename = f'experiments/images/mse_scatter_{data}_{model}_{gates}.png'
     plt.savefig(scatter_filename, bbox_inches='tight', dpi=300)
     plt.close()
 
 pca = False
 model = "Random_Forest"
-gates = 19
+data = "tim"
+gates = 1
 
-save_results_as_image(model, pca, gates)
+save_results_as_image(model, data, pca, gates)
