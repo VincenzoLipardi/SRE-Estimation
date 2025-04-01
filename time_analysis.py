@@ -4,7 +4,7 @@ import pandas as pd
 import pickle  # Use pickle for loading models
 from qiskit import QuantumCircuit
 import matplotlib.pyplot as plt
-from random_forest import load_data
+from models import load_data
 from data.label import calculate_stabilizer_renyi_entropy_qiskit
 
 def calculate_prediction_time(num_qubit, dataset="random", model_directory='experiments'):

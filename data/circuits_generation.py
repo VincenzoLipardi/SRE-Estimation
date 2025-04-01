@@ -78,7 +78,7 @@ def random_quantum_circuit(num_qubits, num_gates, basis_gates):
         # Apply random gates
         for _ in range(num_gates):
             random_gate(num_qubits, basis_gates)
-        return qml.state()  # Return the statevector of the quantum system
+        return qml.state()
 
     # Construct the circuit
     circuit.construct([], {})
@@ -227,8 +227,8 @@ def generate_ising_circuits():
     ising_num_circuits = 1000
     ising_rx_angle = 0.1
 
-    for i in range(2, 7):
-        for j in range(1, 6):
+    for i in range(4, 5):
+        for j in range(5, 6):
             saved_filepath_ising = generate_and_save_circuits(
                 ising_directory,
                 num_qubits=i,

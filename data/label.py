@@ -37,7 +37,7 @@ def calculate_stabilizer_renyi_entropy_qiskit(circuit, alpha=2):
 
     return entropy
 
-def label_random_circuits(qubit_ranges=range(2, 7), gate_ranges=[(0, 19), (20, 39), (40, 59), (60, 79), (80, 99)]):
+def label_random_circuits(qubit_ranges=range(7, 8), gate_ranges=[(0, 19), (20, 39), (40, 59), (60, 79), (80, 99)]):
     for num_qubit in qubit_ranges:
         for gate_range in tqdm(gate_ranges, desc="Gate Ranges", leave=False):
             print("Qubit: ", num_qubit, "Gates: ", gate_range)
@@ -73,7 +73,7 @@ def label_random_circuits(qubit_ranges=range(2, 7), gate_ranges=[(0, 19), (20, 3
                 pickle.dump(result, file)
             print(f"Updated {len(result)} circuits with global expectation values and saved")
 
-def label_ising_circuits(min_qubit=2, max_qubit=7, min_trotter_step=1, max_trotter_step=6):
+def label_ising_circuits(min_qubit=4, max_qubit=6, min_trotter_step=5, max_trotter_step=6):
     qubit_ranges = range(min_qubit, max_qubit)
     trotterization_steps_range = range(min_trotter_step, max_trotter_step)
     
