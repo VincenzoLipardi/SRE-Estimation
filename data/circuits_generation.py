@@ -5,134 +5,67 @@ import pickle
 import os
 from qiskit import QuantumCircuit
 
-# Function to generate a random gate
 def random_gate(num_qubits, basis_gates):
-    gate_list = [
-        qml.PauliX,   # X gate
-        qml.PauliY,   # Y gate
-        qml.PauliZ,   # Z gate
-        qml.Hadamard, # H gate
-        qml.S,        # S gate
-        qml.T,        # T gate
-        qml.RX,       # RX rotation
-        qml.RY,       # RY rotation
-        qml.RZ,       # RZ rotation
-        qml.CNOT      # CNOT gate
-    ]
-    if basis_gates == "Clifford+T" or basis_gates == "clifford+t" or basis_gates == "Clifford+t" or basis_gates == "clifford+T":
-        gate_list = [
-            qml.PauliX,   # X gate
-            qml.PauliY,   # Y gate
-            qml.PauliZ,   # Z gate
-            qml.Hadamard, # H gate
-            qml.S,        # S gate
-            qml.CNOT,     # CNOT gate
-            qml.T,        # T gate
-        ]
-    elif basis_gates == "Clifford" or basis_gates == "clifford":
-        gate_list = [
-            qml.Hadamard, # H gate
-            qml.S,        # S gate
-            qml.T,        # T gate
-            qml.RX,       # RX rotation
-            qml.RY,       # RY rotation
-            qml.RZ,       # RZ rotation
-            qml.CNOT      # CNOT gate
-        ]
-    elif basis_gates == "rotations+cx" or basis_gates == "rotations+cnot" or basis_gates == "Rotations+cx" or basis_gates == "Rotations+cnot" or basis_gates == "Rotations+CNOT" or basis_gates == "Rotations+CNOT":
-        gate_list = [
-            qml.RX,       # RX rotation
-            qml.RY,       # RY rotation
-            qml.RZ,       # RZ rotation
-            qml.CNOT      # CNOT gate
-        ]
-    else:
-        raise ValueError(f"Invalid basis gates: {basis_gates}")
-    
-    # Pick a random gate
-    gate = random.choice(gate_list)
-    # Generate a random qubit index
-    qubit_index = random.randint(0, num_qubits - 1)
-    
-    # For rotation gates, also generate a random angle
-    if gate in [qml.RX, qml.RY, qml.RZ]:
-        return gate(np.random.uniform(0, 2 * np.pi), wires=qubit_index)
-    elif gate == qml.CNOT:
-        # For CNOT, choose two distinct qubits for control and target
-        control = random.randint(0, num_qubits - 1)
-        target = random.randint(0, num_qubits - 1)
-        while target == control:
-            target = random.randint(0, num_qubits - 1)
-        return gate(wires=[control, target])
-    else:
-        return gate(wires=qubit_index)
+    # Normalize basis_gates input
+    basis_gates = basis_gates.lower()
+    basis_dict = {
+        "clifford+t": [qml.PauliX, qml.PauliY, qml.PauliZ, qml.Hadamard, qml.S, qml.CNOT, qml.T],
+        "clifford":   [qml.Hadamard, qml.S, qml.T, qml.RX, qml.RY, qml.RZ, qml.CNOT],
+        "rotations+cx": [qml.RX, qml.RY, qml.RZ, qml.CNOT]
+        }
 
-# Function to generate a random quantum circuit and return the final state
-def random_quantum_circuit(num_qubits, num_gates, basis_gates):
-    # Define a device with the given number of qubits
+    gate_list = basis_dict[basis_gates]
+
+    gate = random.choice(gate_list)
+
+    if gate == qml.CNOT:
+        control, target = random.sample(range(num_qubits), 2)
+        return gate(wires=[control, target])
+    elif gate in [qml.RX, qml.RY, qml.RZ]:
+        angle = np.random.uniform(0, 2 * np.pi)
+        qubit = random.randint(0, num_qubits - 1)
+        return gate(angle, wires=qubit)
+    else:
+        qubit = random.randint(0, num_qubits - 1)
+        return gate(wires=qubit)
+    
+
+def build_qasm_circuit(num_qubits, circuit_body_fn):
     dev = qml.device('lightning.qubit', wires=num_qubits)
 
-    # Define a quantum node (qnode)
     @qml.qnode(dev)
     def circuit():
-        # Apply random gates
-        for _ in range(num_gates):
-            random_gate(num_qubits, basis_gates)
+        circuit_body_fn()
         return qml.state()
 
-    # Construct the circuit
     circuit.construct([], {})
-    
-    # Convert to OpenQASM
     qasm_str = circuit.qtape.to_openqasm()
-    
-    # Remove the measurement and classical bits from the QASM string
     qasm_lines = qasm_str.split('\n')
     qasm_str = '\n'.join([line for line in qasm_lines if not line.startswith('creg') and not line.startswith('measure')])
-    
     return qasm_str
 
-def trotterized_ising_circuits(num_qubits, trotterization_steps, rx_angle):
-    # Define a device with the given number of qubits
-    dev = qml.device('lightning.qubit', wires=num_qubits)
+def random_quantum_circuit(num_qubits, num_gates, basis_gates):
+    def body():
+        for _ in range(num_gates):
+            random_gate(num_qubits, basis_gates)
+    return build_qasm_circuit(num_qubits, body)
 
-    # Define a quantum node (qnode)
-    @qml.qnode(dev)
-    def circuit():
-        # Initialize the qubits in the |+> state
+def trotterized_ising_circuit(num_qubits, trotterization_steps, rx_angle):
+    def body():
         for i in range(num_qubits):
             qml.Hadamard(wires=i)
-        
-        # Apply Trotterized Ising model evolution
         for _ in range(trotterization_steps):
-            # Apply ZZ interactions
             for i in range(num_qubits - 1):
                 qml.CNOT(wires=[i, i + 1])
-                # Ensure RZ angle is less than RX angle
                 rz_angle = np.random.uniform(0, rx_angle)
                 qml.RZ(rz_angle, wires=i + 1)
                 qml.CNOT(wires=[i, i + 1])
-            
-            # Apply local X rotations with the input RX angle
             for i in range(num_qubits):
                 qml.RX(rx_angle, wires=i)
+    return build_qasm_circuit(num_qubits, body)
 
-        return qml.state()  # Return the statevector of the quantum system
 
-    # Construct the circuit
-    circuit.construct([], {})
-    
-    # Convert to OpenQASM
-    qasm_str = circuit.qtape.to_openqasm()
-    
-    # Remove the measurement and classical bits from the QASM string
-    qasm_lines = qasm_str.split('\n')
-    qasm_str = '\n'.join([line for line in qasm_lines if not line.startswith('creg') and not line.startswith('measure')])
-    
-    return qasm_str
-
-# Function to generate random circuits or Ising model circuits within a range of qubits and gates and save them
-def generate_and_save_circuits(directory, num_qubits, num_circuits, basis_gates, circuit_type='random', gate_range=None, trotterization_steps=1, rx_angle=0.1):
+def generate_and_save_circuits(directory, num_qubits, num_circuits, basis_gates, circuit_type='random', gate_range=None, trotterization_steps=1):
     # Create a directory for saving the QASM files
     os.makedirs(directory, exist_ok=True)
     
@@ -148,19 +81,19 @@ def generate_and_save_circuits(directory, num_qubits, num_circuits, basis_gates,
             circuits.append({
                 'qasm': qasm_str,
                 'num_qubits': num_qubits,
-                'num_gates': num_gates
+                #'num_gates': num_gates
             })
     elif circuit_type == 'ising':
         for _ in range(num_circuits):
             # Generate a random RX angle in the range [0, 2π]
             random_rx_angle = np.random.uniform(0, 2 * np.pi)
             # Generate the Trotterized Ising circuit and get the QASM string
-            qasm_str = trotterized_ising_circuits(num_qubits, trotterization_steps, random_rx_angle)
+            qasm_str = trotterized_ising_circuit(num_qubits, trotterization_steps, random_rx_angle)
             circuits.append({
                 'qasm': qasm_str,
                 'num_qubits': num_qubits,
-                'h': 'random',  # Use 'random' to indicate RX angles are random
-                'J': 'random'   # Placeholder for RZ angle, as it is random
+                #'h': 'random',  # Use 'random' to indicate RX angles are random
+                #'J': 'random'   # Placeholder for RZ angle, as it is random
             })
     else:
         raise ValueError(f"Invalid circuit type: {circuit_type}")
@@ -171,9 +104,6 @@ def generate_and_save_circuits(directory, num_qubits, num_circuits, basis_gates,
     elif circuit_type == 'ising':
         filename = f"ising_qubits_{num_qubits}_trotter_{trotterization_steps}.pkl"
 
-    # Ensure the directory exists
-    os.makedirs(directory, exist_ok=True)
-    
     filepath = os.path.join(directory, filename)
     
     # Check if the file already exists
@@ -188,61 +118,66 @@ def generate_and_save_circuits(directory, num_qubits, num_circuits, basis_gates,
     return filepath
 
 def pennylane_circuit_from_qasm(qasm_str, num_qubits):
-    dev = qml.device('default.qubit', wires=num_qubits)  # Assuming max 10 qubits, adjust if needed
+    dev = qml.device('default.qubit', wires=num_qubits) 
     
     @qml.qnode(dev)
     def circuit():
         qml.from_qasm(qasm_str)
         return qml.state()
-    #print(qml.draw(circuit)())
-    #print("\n" + "-"*50 + "\n")
     return circuit
 
 def qiskit_circuit_from_qasm(qasm_str, num_qubits):
     qc = QuantumCircuit.from_qasm_str(qasm_str)
     return qc
 
-def generate_random_circuits(min_qubits=2, max_qubits=7):
-    random.seed(0)
-    directory = "dataset_random"
-    random_num_circuits = 10000
-    random_basis_gates = "rotations+cx"
-    ranges = [(0, 19), (20, 39), (40, 59), (60, 79), (80, 99)]
-
-    for start, end in ranges:
-        random_gate_range = (start, end)
-        filename_suffix = f"{start}-{end}"
-        for i in range(min_qubits, max_qubits):  # Loop over the number of qubits
-            saved_filepath_random = generate_and_save_circuits(
-                directory,
-                num_qubits=i,
-                num_circuits=random_num_circuits,
-                basis_gates=random_basis_gates,
-                circuit_type='random',
-                gate_range=random_gate_range
-            )
-
-def generate_ising_circuits():
-    ising_directory = "dataset_tim"
-    ising_num_circuits = 1000
-    ising_rx_angle = 0.1
-
-    for i in range(4, 5):
-        for j in range(5, 6):
-            saved_filepath_ising = generate_and_save_circuits(
-                ising_directory,
-                num_qubits=i,
-                num_circuits=ising_num_circuits,
-                basis_gates="rotations+cx",  # Assuming same basis for consistency
-                circuit_type='ising',
-                trotterization_steps=j,
-                rx_angle=ising_rx_angle
-            )
+def generate_circuits(
+    circuit_type,
+    directory,
+    num_circuits,
+    basis_gates,
+    qubit_range,
+    gate_ranges=None,
+    trotter_steps_list=None
+):
+    for num_qubits in qubit_range:
+        if circuit_type == 'random':
+            for gate_range in gate_ranges:
+                generate_and_save_circuits(
+                    directory=directory,
+                    num_qubits=num_qubits,
+                    num_circuits=num_circuits,
+                    basis_gates=basis_gates,
+                    circuit_type='random',
+                    gate_range=gate_range
+                )
+        elif circuit_type == 'ising':
+            for trotter_steps in trotter_steps_list:
+                generate_and_save_circuits(
+                    directory=directory,
+                    num_qubits=num_qubits,
+                    num_circuits=num_circuits,
+                    basis_gates=basis_gates,
+                    circuit_type='ising',
+                    trotterization_steps=trotter_steps
+                )
 
 if __name__ == "__main__":
-    # Choose which type of circuits to generate
-    generate_random_circuits(min_qubits=2, max_qubits=3)
-    # generate_ising_circuits()
-
-
-
+    # Example usage for random circuits
+    generate_circuits(
+        circuit_type='random',
+        directory="dataset_random",
+        num_circuits=10000,
+        basis_gates="rotations+cx",
+        qubit_range=range(2, 3),  # 2 to 2 (change to range(2, 7) for 2-6)
+        gate_ranges=[(0, 19), (20, 39), (40, 59), (60, 79), (80, 99)]
+    )
+    # Example usage for ising circuits
+    generate_circuits(
+        circuit_type='ising',
+        directory="dataset_tim",
+        num_circuits=1000,
+        basis_gates="rotations+cx",
+        qubit_range=range(4, 5),  # 4 to 4
+        trotter_steps_list=[5]
+    )
+    
