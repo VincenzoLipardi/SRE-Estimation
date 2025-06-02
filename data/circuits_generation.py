@@ -167,7 +167,7 @@ def generate_and_save_circuits(directory, num_qubits, num_circuits, basis_gates,
 
     # Define the filename based on the circuit type
     if circuit_type == 'random':
-        filename = f"{circuit_type}_basis_{basis_gates}_qubits_{num_qubits}_gates_{gate_range[0]}-{gate_range[1]-1}.pkl"
+        filename = f"basis_{basis_gates}_qubits_{num_qubits}_gates_{gate_range[0]}-{gate_range[1]}.pkl"
     elif circuit_type == 'ising':
         filename = f"ising_qubits_{num_qubits}_trotter_{trotterization_steps}.pkl"
 
@@ -202,9 +202,9 @@ def qiskit_circuit_from_qasm(qasm_str, num_qubits):
     qc = QuantumCircuit.from_qasm_str(qasm_str)
     return qc
 
-def generate_random_circuits():
+def generate_random_circuits(min_qubits=2, max_qubits=7):
     random.seed(0)
-    random_directory = "dataset_random"
+    directory = "dataset_random"
     random_num_circuits = 10000
     random_basis_gates = "rotations+cx"
     ranges = [(0, 19), (20, 39), (40, 59), (60, 79), (80, 99)]
@@ -212,9 +212,9 @@ def generate_random_circuits():
     for start, end in ranges:
         random_gate_range = (start, end)
         filename_suffix = f"{start}-{end}"
-        for i in range(2, 7):  # Loop over the number of qubits
+        for i in range(min_qubits, max_qubits):  # Loop over the number of qubits
             saved_filepath_random = generate_and_save_circuits(
-                random_directory,
+                directory,
                 num_qubits=i,
                 num_circuits=random_num_circuits,
                 basis_gates=random_basis_gates,
@@ -241,8 +241,8 @@ def generate_ising_circuits():
 
 if __name__ == "__main__":
     # Choose which type of circuits to generate
-    #generate_random_circuits()
-    generate_ising_circuits()
+    generate_random_circuits(min_qubits=2, max_qubits=3)
+    # generate_ising_circuits()
 
 
 

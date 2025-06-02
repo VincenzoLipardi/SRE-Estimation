@@ -128,7 +128,7 @@ def qasm_to_gate_counts(qasm_str):
     
     # Count gates and track rotation angles
     for instruction in circuit.data:
-        gate_name = instruction[0].name.lower()
+        gate_name = instruction.operation.name.lower()
         if gate_name in ["cx", "h"]:
             gate_counts[gate_name] += 1
         elif gate_name in ["rx", "ry", "rz"]:
@@ -136,28 +136,24 @@ def qasm_to_gate_counts(qasm_str):
             gate_counts[gate_name] += 1
             
             # Get the qubit object
-            qubit = instruction[1][0]
+            qubit = instruction.qubits[0]
             
             # Extract the index from the Qubit object
             try:
-                # For newer Qiskit versions where qubit is a Qubit object
-                qubit_idx = qubit._index
+                qubit_idx = qubit.index
             except AttributeError:
                 try:
-                    # Alternative way to get index from Qubit object
-                    qubit_idx = qubit.index
+                    qubit_idx = qubit._index
                 except AttributeError:
-                    # If both fail, try to get the second number from the string representation
-                    # Format is typically: Qubit(QuantumRegister(n, 'q'), index)
                     qubit_str = str(qubit)
                     try:
                         qubit_idx = int(qubit_str.split(', ')[-1].split(')')[0])
                     except (ValueError, IndexError):
                         print(f"Warning: Using circuit position for {qubit}")
-                        qubit_idx = instruction[1][0]._index if hasattr(instruction[1][0], '_index') else 0
+                        qubit_idx = 0
             
             # Get the parameter (angle) from the instruction
-            angle = float(instruction[0].params[0])
+            angle = float(instruction.operation.params[0])
             # Add the absolute value of the angle to the cumulative sum
             rotation_angles[f"{gate_name}_q{qubit_idx}"] += abs(angle)
     
@@ -202,14 +198,14 @@ def qasm_to_gate_bins(qasm_str):
     
     # Count gates and bin rotation angles
     for instruction in circuit.data:
-        gate_name = instruction[0].name.lower()
+        gate_name = instruction.operation.name.lower()
         
         if gate_name in ["cx", "h"]:
             gate_counts[gate_name] += 1
             
         elif gate_name in ["rx", "ry", "rz"]:
             # Get the parameter (angle) from the instruction
-            angle = float(instruction[0].params[0])
+            angle = float(instruction.operation.params[0])
             
             # Ensure angle is in [0, 2π)
             angle = angle % (2*np.pi)
@@ -226,7 +222,6 @@ def qasm_to_gate_bins(qasm_str):
     
     # Combine gate counts and rotation bins into a single dictionary
     gate_counts.update(rotation_bins)
-    
     return gate_counts
 
 def process_circuits(qubit_ranges=range(2, 7), gate_ranges=[(0, 19), (20, 39), (40, 59), (60, 79), (80, 99)]):
@@ -277,7 +272,7 @@ def process_circuits(qubit_ranges=range(2, 7), gate_ranges=[(0, 19), (20, 39), (
         
     print(f"Dataset successfully generated and saved to {filename}")
 
-def process_ising_circuits(min_qubit=4, max_qubit=5, min_trotter_step=5, max_trotter_step=6):
+def process_ising_circuits(min_qubit=2, max_qubit=7, min_trotter_step=10, max_trotter_step=11):
     qubit_ranges = range(min_qubit, max_qubit)  # Adjust as needed
     trotterization_steps_range = range(min_trotter_step, max_trotter_step)  # Adjust as needed
     
@@ -329,104 +324,16 @@ def process_ising_circuits(min_qubit=4, max_qubit=5, min_trotter_step=5, max_tro
     print(f"Dataset successfully generated and saved to {filename}")
 
 
-def gate_counts_to_circuits(qubit_ranges=range(2, 7), gate_ranges=[(0, 19), (20, 39), (40, 59), (60, 79), (80, 99)]):
-    """
-    Opens existing circuit files and adds or updates gate_counts column to the data.
-    The circuits are stored as list of 2-length tuples, where the first element is the dictionary.
-    
-    Parameters:
-    - qubit_ranges: Range of number of qubits in the circuits
-    - gate_ranges: List of tuples containing (min_gates, max_gates) ranges
-    """
-    for num_qubit in qubit_ranges:
-        for gate_range in tqdm(gate_ranges, desc=f"Processing qubit {num_qubit}", leave=True):
-            # Add 'data/' prefix to the path
-            filename = f"data/dataset_random/basis_rotations+cx_qubits_{num_qubit}_gates_{gate_range[0]}-{gate_range[1]}.pkl"
-            try:
-                # Load circuits from pkl file
-                circuits = load_circuits(filename)
-                
-                if not isinstance(circuits[0], tuple) or len(circuits[0]) != 2:
-                    print(f"Skipping {filename}: Data not in expected (dict, value) tuple format")
-                    continue
-                
-                print(f"Processing {filename}: Adding/Updating gate_counts")
-                
-                # Add or update gate counts for each circuit
-                for circuit_tuple in tqdm(circuits, desc="Circuits", leave=False):
-                    circuit_dict = circuit_tuple[0]  # Get the dictionary from the tuple
-                    
-                    # Always update gate_counts with the new version
-                    if "gate_counts" in circuit_dict:
-                        print(f"Updating existing gate_counts in {filename}")
-                        del circuit_dict["gate_counts"]  # Remove old gate_counts
-                    
-                    # Add new gate_counts
-                    circuit_dict["gate_counts"] = qasm_to_gate_counts(circuit_dict['qasm'])
-                
-                # Save the updated circuit data
-                save_updated_circuits(filename, circuits)
-                print(f"Successfully updated {filename}")
-                
-            except FileNotFoundError:
-                print(f"Warning: File {filename} not found, skipping...")
-            except Exception as e:
-                print(f"Error processing {filename}: {str(e)}")
-    
-    print("Finished processing all files")
 
-def gate_counts_to_ising_circuits(min_qubit=4, max_qubit=5, min_trotter_step=5, max_trotter_step=6):
-    """
-    Opens existing Ising circuit files and adds or updates gate_counts column to the data.
-    The circuits are stored as list of 2-length tuples, where the first element is the dictionary.
-    
-    Parameters:
-    - min_qubit: Minimum number of qubits in the circuits
-    - max_qubit: Maximum number of qubits in the circuits
-    - min_trotter_step: Minimum number of Trotter steps
-    - max_trotter_step: Maximum number of Trotter steps
-    """
-    qubit_ranges = range(min_qubit, max_qubit)
-    trotterization_steps_range = range(min_trotter_step, max_trotter_step)
-    
-    for num_qubit in qubit_ranges:
-        for trotter_steps in tqdm(trotterization_steps_range, desc=f"Processing qubit {num_qubit}", leave=True):
-            filename = f"dataset_tim/ising_qubits_{num_qubit}_trotter_{trotter_steps}.pkl"
-            try:
-                # Load circuits from pkl file
-                circuits = load_circuits(filename)
-                
-                if not isinstance(circuits[0], tuple) or len(circuits[0]) != 2:
-                    print(f"Skipping {filename}: Data not in expected (dict, value) tuple format")
-                    continue
-                
-                print(f"Processing {filename}: Adding/Updating gate_counts")
-                
-                # Add or update gate counts for each circuit
-                for circuit_tuple in tqdm(circuits, desc="Circuits", leave=False):
-                    circuit_dict = circuit_tuple[0]  # Get the dictionary from the tuple
-                    
-                    # Always update gate_counts with the new version
-                    if "gate_counts" in circuit_dict:
-                        print(f"Updating existing gate_counts in {filename}")
-                        del circuit_dict["gate_counts"]  # Remove old gate_counts
-                    
-                    # Add new gate_counts
-                    circuit_dict["gate_counts"] = qasm_to_gate_counts(circuit_dict['qasm'])
-                
-                # Save the updated circuit data
-                save_updated_circuits(filename, circuits)
-                print(f"Successfully updated {filename}")
-                
-            except FileNotFoundError:
-                print(f"Warning: File {filename} not found, skipping...")
-            except Exception as e:
-                print(f"Error processing {filename}: {str(e)}")
-    
-    print("Finished processing all files")
+
+
+
+
+
 
 if __name__ == "__main__":
-    # process_circuits()
+    process_circuits()
     # process_ising_circuits()
-    #gate_counts_to_circuits()
-    gate_counts_to_ising_circuits()
+    # gate_counts_to_circuits("tim", min_qubit=4, max_qubit=5, min_trotter_step=5, max_trotter_step=6)  # For tim dataset
+    # gate_bins_to_circuits("random")
+

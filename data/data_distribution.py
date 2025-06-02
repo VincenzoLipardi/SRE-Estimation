@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 from matplotlib.ticker import PercentFormatter
 
-def load_entropy_data(directory, num_qubits):
+def load_entropy_data(directory, num_qubits, trotter_steps_list=None):
     # Initialize as dictionary
     entropy_data = {}
     for filename in os.listdir(directory):
@@ -13,7 +13,14 @@ def load_entropy_data(directory, num_qubits):
             filepath = os.path.join(directory, filename)
             # Extract the number from filename
             if 'dataset_tim' in directory:
-                key = int(filename.split('_trotter_')[1].split('.')[0])  # get number of trotter steps
+                # Only process files with trotter steps in trotter_steps_list (if provided)
+                try:
+                    trotter_steps = int(filename.split('_trotter_')[1].split('.')[0])
+                except (IndexError, ValueError):
+                    continue
+                if trotter_steps_list is not None and trotter_steps not in trotter_steps_list:
+                    continue
+                key = trotter_steps  # get number of trotter steps
             else:  # dataset_random
                 # Extract the last two digits before .pkl
                 key = int(filename.split('.pkl')[0][-2:])
@@ -52,15 +59,16 @@ def plot_histograms(entropy_data, num_qubits):
         counts, _ = np.histogram(cluster, bins=global_bin_edges)
         normalized_counts = counts / counts.sum()
 
+        label_prefix = 'Trotter Steps' if 'dataset_tim' in directory else 'Gate Count'
         plt.bar(global_bin_centers, normalized_counts, 
                width=(global_bin_edges[1] - global_bin_edges[0]), 
-               alpha=0.9, label=f'Gates {key}. Avg: {stats[key][0]}, Std: {stats[key][1]}')
+               alpha=0.8, label=f'{label_prefix} {key-19}-{key}. Avg: {stats[key][0]:.3f}, Std: {stats[key][1]:.3f}')
     
     # Set x-ticks to bin centers
-    plt.xticks(global_bin_centers, rotation=45)
+    plt.xticks(global_bin_centers, [f'{x:.3f}' for x in global_bin_centers], rotation=45)
     plt.gca().yaxis.set_major_formatter(PercentFormatter(1.0))
     
-    plt.title(f'Stabilizer Rényi Entropy Distribution in {num_qubits}-qubit circuits')
+    # plt.title(f'Stabilizer Rényi Entropy Distribution in {num_qubits}-qubit circuits')
     plt.xlabel('Stabilizer Rényi Entropy')
     plt.ylabel('Frequency (%)')
     plt.legend()
@@ -74,12 +82,15 @@ def plot_histograms(entropy_data, num_qubits):
     print("Image saved as:", filename)
     return stats, 
 
-def plot_combined_histograms(directory, qubit_range):
+def plot_combined_histograms(directory, qubit_range, trotter_steps_list=None):
     plt.figure(figsize=(10, 6))
     
     averages = []  # Store averages for later use
     for num_qubits in qubit_range:
-        entropy_data = load_entropy_data(directory, num_qubits)
+        if 'dataset_tim' in directory:
+            entropy_data = load_entropy_data(directory, num_qubits, trotter_steps_list=trotter_steps_list)
+        else:
+            entropy_data = load_entropy_data(directory, num_qubits)
         entropy_data = [value for cluster in entropy_data.values() for value in cluster]
         average = np.mean(entropy_data)
         averages.append(average)
@@ -98,7 +109,7 @@ def plot_combined_histograms(directory, qubit_range):
                     ha='center',
                     color=line.get_color())
     
-    plt.title('Stabilizer Rényi Entropy Distribution in the dataset')
+    # plt.title('Stabilizer Rényi Entropy Distribution in the dataset')
     plt.xlabel('Stabilizer Rényi Entropy')
     plt.ylabel('Frequency (%)')
     plt.legend()
@@ -115,16 +126,25 @@ def plot_combined_histograms(directory, qubit_range):
     plt.margins(y=0.15)
     
     filename = directory+"/images/combined_magic_distribution.png"
-    plt.savefig(filename)
+    plt.savefig(filename, bbox_inches='tight', pad_inches=0.1)  # Reduce whitespace
     print("Combined image saved as:", filename)
 
-if __name__ == "__main__":
-    directories = ['dataset_tim', 'dataset_random']
-    qubit_range = range(2, 7)
-    for directory in directories:
-        """for num_qubits in qubit_range:
-            entropy_data = load_entropy_data(directory, num_qubits)
-            plot_histograms(entropy_data, num_qubits)"""
 
-        # Plot combined histograms
-        plot_combined_histograms(directory, qubit_range)
+
+if __name__ == "__main__":
+    directories = ['dataset_random']
+    qubit_range = range(2, 7)
+    trotter_steps_list = [1, 2, 3, 4, 5]  # Or set as desired
+    for directory in directories:
+        for num_qubits in qubit_range:
+            if 'dataset_tim' in directory:
+                entropy_data = load_entropy_data(directory, num_qubits, trotter_steps_list=trotter_steps_list)
+            else:
+                entropy_data = load_entropy_data(directory, num_qubits)
+            plot_histograms(entropy_data, num_qubits)
+
+        """# Plot combined histograms
+        if 'dataset_tim' in directory:
+            plot_combined_histograms(directory, qubit_range, trotter_steps_list=trotter_steps_list)
+        else:
+            plot_combined_histograms(directory, qubit_range)"""
