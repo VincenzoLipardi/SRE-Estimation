@@ -23,24 +23,9 @@ def extract_features(circuit_tuple, feature_set):
     if feature_set == 'shadow':
         shadows = [float(v) for k, v in circuit_dict.items() if 'obs_' in k and v is not None]
         return shadows, sre
-    
-    # Extract DAG
     dag = circuit_dict.get('dag', None)
     if feature_set == 'dag':
         return dag, sre
-    if feature_set == 'gate_counts':
-        # Extract gate counts
-        feature_to_extract = ["h", "cx", "rx", "ry", "rz"]
-        num_qubits = circuit_dict.get('num_qubits', None)
-        gate_counts = circuit_dict.get('gate_counts', {})
-        for i in range(num_qubits):
-            feature_to_extract.append(f"rx_q{i}")
-            feature_to_extract.append(f"ry_q{i}")
-            feature_to_extract.append(f"rz_q{i}")
-    
-        # Use get() method with default value 0 for missing keys
-        gate_counts = [gate_counts.get(feature, 0) for feature in feature_to_extract]
-        return gate_counts, sre
     if feature_set == 'gate_bins':
         gate_bins = list(circuit_dict.get('gate_bins', {}).values())
         return gate_bins, sre
@@ -106,9 +91,6 @@ def main():
         for feature_set in feature_sets:
             process_dataset(dataset, feature_set, num_qubits)
             
-            
-        
-    
 
 if __name__ == "__main__":
     main()
