@@ -168,7 +168,7 @@ if __name__ == "__main__":
         directory="dataset_random",
         num_circuits=10000,
         basis_gates="rotations+cx",
-        qubit_range=range(2, 3),  # 2 to 2 (change to range(2, 7) for 2-6)
+        qubit_range=range(2, 7), 
         gate_ranges=[(0, 19), (20, 39), (40, 59), (60, 79), (80, 99)]
     )
     # Example usage for ising circuits
@@ -177,7 +177,7 @@ if __name__ == "__main__":
         directory="dataset_tim",
         num_circuits=1000,
         basis_gates="rotations+cx",
-        qubit_range=range(4, 5),  # 4 to 4
-        trotter_steps_list=[5]
+        qubit_range=range(2, 7),  
+        trotter_steps_list=range(1, 10)
     )
     
