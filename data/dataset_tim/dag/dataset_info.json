@@ -1,0 +1,85 @@
+{
+  "num_circuits": 50,
+  "num_qubits": 2,
+  "sample_labels": [
+    0.31943375089089043,
+    0.2844428942100301,
+    0.3234376717115437,
+    0.17273574672536607,
+    0.2825725083795443
+  ],
+  "sample_metadata": [
+    {
+      "num_qubits": 2,
+      "total_gates": 7,
+      "gate_counts": {
+        "rx": 2,
+        "ry": 0,
+        "rz": 1,
+        "cx": 2,
+        "h": 2,
+        "measure": 0
+      },
+      "depth": 5,
+      "global_features": [
+        2,
+        7,
+        2,
+        0,
+        1,
+        2,
+        2,
+        0,
+        5
+      ]
+    },
+    {
+      "num_qubits": 2,
+      "total_gates": 7,
+      "gate_counts": {
+        "rx": 2,
+        "ry": 0,
+        "rz": 1,
+        "cx": 2,
+        "h": 2,
+        "measure": 0
+      },
+      "depth": 5,
+      "global_features": [
+        2,
+        7,
+        2,
+        0,
+        1,
+        2,
+        2,
+        0,
+        5
+      ]
+    },
+    {
+      "num_qubits": 2,
+      "total_gates": 7,
+      "gate_counts": {
+        "rx": 2,
+        "ry": 0,
+        "rz": 1,
+        "cx": 2,
+        "h": 2,
+        "measure": 0
+      },
+      "depth": 5,
+      "global_features": [
+        2,
+        7,
+        2,
+        0,
+        1,
+        2,
+        2,
+        0,
+        5
+      ]
+    }
+  ]
+}
