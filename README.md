@@ -63,7 +63,6 @@ Generate data if they do not appear in [directory](data/random_circuits/)
 Train Machine Learning models:
 
 - [classical ML models](models.py)
-- [Graph Neural Network (GNN)](gnn.py)
 - [Training Pipeline](training.py)
 
 ## License
